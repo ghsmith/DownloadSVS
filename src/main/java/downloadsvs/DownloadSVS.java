@@ -53,6 +53,10 @@ public class DownloadSVS {
               .POST(HttpRequest.BodyPublishers.ofString(String.format("{\"Domain\":\"\",\"Password\":\"%s\",\"UserName\":\"%s\"}", p, u)))
               .build();
             HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+            if(response == null || response.statusCode() != 200) {
+                System.out.println("login failed");
+                System.exit(1);
+            }
             System.out.println("logged into server");
         }
 
