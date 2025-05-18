@@ -2,6 +2,7 @@ package downloadsvs;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.net.CookieHandler;
 import java.net.CookieManager;
@@ -25,6 +26,11 @@ public class DownloadSVS {
    
     public static void main(String[] args) throws Exception {
 
+        if(args.length > 1 && !args[1].matches("^([^-]*)-([^-]*)-([A-Z][^-]*)-([^-]*)$")) {
+            System.out.println("bad slide ID format (e.g., S25-12345-A1-1)");
+            System.exit(1);
+        }
+        
         Properties prop = new Properties();
         InputStream stream = new FileInputStream(args[0]);
         prop.load(stream);        
@@ -47,6 +53,7 @@ public class DownloadSVS {
               .POST(HttpRequest.BodyPublishers.ofString(String.format("{\"Domain\":\"\",\"Password\":\"%s\",\"UserName\":\"%s\"}", p, u)))
               .build();
             HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+            System.out.println("logged into server");
         }
 
         String slideId = args[1];
@@ -101,6 +108,12 @@ public class DownloadSVS {
 
         }
 
+        if(uniViewHistoryItemIdentifier == null ) {
+            System.out.println(String.format("examination \"%s\" not found", accNo));
+            logout(url, client);
+            System.exit(1);
+        }
+        
         // INITIALIZE PATHOLOGY SESSION
         String value = null;
         String hash = null;
@@ -121,6 +134,7 @@ public class DownloadSVS {
         }
 
         // LOOP THROUGH SLIDES
+        boolean slideFound = false;
         {
             HttpRequest requestSlides = HttpRequest.newBuilder()
               .uri(URI.create(String.format(url + "/SectraPathologyServer/api/requestslides?requestId=%s&hash=%s", URLEncoder.encode(value), URLEncoder.encode(hash))))
@@ -132,6 +146,7 @@ public class DownloadSVS {
             for(Iterator iterSlides = joSlides.getJSONArray("slides").iterator(); iterSlides.hasNext(); ) {
                 JSONObject slideJson = (JSONObject)iterSlides.next();
                 if(slideJson.get("labSlideIdString").equals(slideId) && slideJson.getBoolean("hasImage")) {
+                    slideFound = true;
                     HttpRequest requestDetails = HttpRequest.newBuilder()
                       .uri(URI.create(String.format(url + "/SectraPathologyServer/api/slides/%s/details", slideJson.getString("id"))))
                       .setHeader("content-type", "application/x-www-form-urlencoded; charset=UTF-8")
@@ -139,7 +154,7 @@ public class DownloadSVS {
                       .build();
                     HttpResponse<String> responseDetails = client.send(requestDetails, HttpResponse.BodyHandlers.ofString());
                     JSONObject joDetails = new JSONObject(responseDetails.body());
-                    System.out.println();
+                    System.out.println("slide found");
                     System.out.println(String.format("%s\t%s\t%s\t%s",
                         slideJson.getString("requestIdString"),
                         slideJson.getString("labSlideIdString"),
@@ -174,16 +189,24 @@ public class DownloadSVS {
             }
         }
 
-        // LOGOUT
-        {
-            HttpRequest request = HttpRequest.newBuilder()
-              .uri(URI.create(url + "/uniview/Logout.ashx"))
-              .setHeader("content-type", "application/x-www-form-urlencoded; charset=UTF-8")
-              .POST(HttpRequest.BodyPublishers.ofString(String.format("0")))
-              .build();
-            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+        if(!slideFound) {
+            System.out.println(String.format("slide \"%s\" not found", slideId));
+            logout(url, client);
+            System.exit(1);
         }
         
+        logout(url, client);
+
+    }
+
+    public static void logout(String url, HttpClient client) throws IOException, InterruptedException {
+        HttpRequest request = HttpRequest.newBuilder()
+          .uri(URI.create(url + "/uniview/Logout.ashx"))
+          .setHeader("content-type", "application/x-www-form-urlencoded; charset=UTF-8")
+          .POST(HttpRequest.BodyPublishers.ofString(String.format("0")))
+          .build();
+        HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+        System.out.println("logged out of server");
     }
     
 }
