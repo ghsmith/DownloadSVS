@@ -128,13 +128,9 @@ public class DownloadSVS {
               .POST(HttpRequest.BodyPublishers.ofString(String.format("fetchToken=%s", URLEncoder.encode(fetchToken))))
               .build();
             HttpResponse<String> responsePathSession = client.send(requestPathSession, HttpResponse.BodyHandlers.ofString());
-            //System.out.println(response.statusCode());
-            //System.out.println(response.body());
             JSONObject joPathSession = new JSONObject(responsePathSession.body());
             value = joPathSession.getString("Value");
             hash = joPathSession.getString("Hash");
-            //System.out.println(value);
-            //System.out.println(hash);
         }
 
         // LOOP THROUGH SLIDES
